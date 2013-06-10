@@ -31,7 +31,6 @@ module Lims
           include Virtus
           include Aequitas
           attribute :url, String, :required => true, :writer => :private
-          attribute :exchange_name, String, :required => true, :writer => :private
           attribute :durable, String, :required => true, :writer => :private
           attribute :empty_queue_disconnect_interval, Numeric, :required => false, :writer => :private
         end
@@ -41,26 +40,16 @@ module Lims
       # @param [Hash] settings
       def consumer_setup(settings = {})
         @url = settings["url"]
-        @exchange_name = settings["exchange_name"]
         @durable = settings["durable"] 
         @empty_queue_disconnect_interval = settings["empty_queue_disconnect_interval"] || 0
-        @queues = {} 
+        @queue = {} 
       end
 
       # Register a new queue 
-      # All the messages published which match the routing key
-      # will be available in the queue and processed by the
-      # queue handler.
       # @param [String] queue name
-      # @param [Array<String>] routing keys
       # @param [Block] queue handler
-      def add_queue(queue_name, routing_keys = [], &queue_handler)
-        if routing_keys
-          routing_keys.each do |routing_key|
-            raise InvalidSettingsError, "routing keys are not in the right format" unless RoutingKey.valid?(routing_key)
-          end
-        end
-        @queues[queue_name] = {:routing_keys => routing_keys, :queue_handler => queue_handler}
+      def add_queue(queue_name, &queue_handler)
+        @queue = {:queue_name => queue_name, :queue_handler => queue_handler}
       end
 
       # Start the consumer
@@ -82,20 +71,9 @@ module Lims
       # @param [AMQP::Session] connection
       def build(connection)
         channel = ::AMQP::Channel.new(connection)
-        exchange = ::AMQP::Exchange.new(channel, :topic, exchange_name, :durable => durable)
-
-        @queues.each do |queue_name, settings|
-          queue = channel.queue(queue_name, :durable => durable)
-          setup_automatic_termination(connection, queue)
-          if settings[:routing_keys]
-            settings[:routing_keys].each do |routing_key|
-              queue.bind(exchange, :routing_key => routing_key)
-            end
-          else
-            queue.bind(exchange)
-          end
-          queue.subscribe(:ack => true, &settings[:queue_handler])
-        end
+        queue = channel.queue(@queue[:queue_name], :durable => durable)
+        setup_automatic_termination(connection, queue)
+        queue.subscribe(:ack => true, &@queue[:queue_handler])
       end
 
       # Build the connection settings hash
@@ -159,6 +137,7 @@ module Lims
         end unless empty_queue_disconnect_interval.zero?
       end
 
+      # Unused currently
       module RoutingKey
         ValidationRegex = /^(\w+|\*|#)(\.(\w+|\*|#))*$/
 
