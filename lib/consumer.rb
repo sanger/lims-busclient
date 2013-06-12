@@ -2,6 +2,8 @@ require 'facets/hash'
 require 'virtus'
 require 'aequitas/virtus_integration'
 require 'amqp'
+require 'json'
+require 'time'
 
 module Lims
   module BusClient
@@ -26,6 +28,7 @@ module Lims
 
       # Define the parameters needed to connect to RabbitMQ
       # and to setup the exchange.
+      # message_timeout is a time in number of seconds.
       def self.included(klass)
         klass.class_eval do
           include Virtus
@@ -33,6 +36,7 @@ module Lims
           attribute :url, String, :required => true, :writer => :private
           attribute :durable, String, :required => true, :writer => :private
           attribute :empty_queue_disconnect_interval, Numeric, :required => false, :writer => :private
+          attribute :message_timeout, Numeric, :required => false, :writer => :private
         end
       end
 
@@ -42,6 +46,7 @@ module Lims
         @url = settings["url"]
         @durable = settings["durable"] 
         @empty_queue_disconnect_interval = settings["empty_queue_disconnect_interval"] || 0
+        @message_timeout = settings["message_timeout"]
         @queue = {} 
       end
 
@@ -73,7 +78,33 @@ module Lims
         channel = ::AMQP::Channel.new(connection)
         queue = channel.queue(@queue[:queue_name], :durable => durable)
         setup_automatic_termination(connection, queue)
-        queue.subscribe(:ack => true, &@queue[:queue_handler])
+        handler = setup_queue_handler(@queue[:queue_handler])
+        queue.subscribe(:ack => true, &handler)
+      end
+
+      # @param [Block] queue_handler
+      # If the timeout parameter is set, and the message 
+      # has been redelivered (if metadata.redelivered? returns true)
+      # and if the message is too old, then it is discarded.
+      def setup_queue_handler(queue_handler)
+        lambda do |metadata, payload|
+          if message_timeout && metadata.redelivered? && message_timeout?(payload)
+            metadata.reject
+          else
+            queue_handler[metadata, payload]
+          end
+        end
+      end
+
+      # @param [String] payload
+      # @return [Bool]
+      # Return true if the message is older than 
+      # the allowed living time.
+      def message_timeout?(payload)
+        date_str = JSON.parse(payload)["date"]
+        date = Time.parse(date_str) 
+        date_now = Time.now.utc
+        (date_now - date) > message_timeout 
       end
 
       # Build the connection settings hash
