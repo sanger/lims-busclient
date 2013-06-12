@@ -5,9 +5,6 @@ require 'amqp'
 require 'json'
 require 'time'
 
-require 'rubygems'
-require 'ruby-debug/debugger'
-
 module Lims
   module BusClient
     # A consumer connects to a RabbitMQ broker and receives
