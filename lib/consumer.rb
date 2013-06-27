@@ -90,6 +90,9 @@ module Lims
         lambda do |metadata, payload|
           if message_timeout && metadata.redelivered? && message_timeout?(payload)
             metadata.reject
+            if self.instance_variables.include?(:@log)
+              log.error("Message timeout. The message has been rejected. Routing key: #{metadata.routing_key} with payload: #{payload}")
+            end
           else
             queue_handler[metadata, payload]
           end
