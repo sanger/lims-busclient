@@ -1,5 +1,5 @@
 module Lims
   module BusClient
-    VERSION = "0.3.1"
+    VERSION = "0.4.0.rc1"
   end
 end
