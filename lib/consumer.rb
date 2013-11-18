@@ -112,7 +112,7 @@ module Lims
 
       # Build the connection settings hash
       def connection_settings
-        connection_settings = ::AMQP::Client.parse_connection_uri(url)
+        connection_settings = ::AMQP::Settings.parse_connection_uri(url)
         connection_settings[:on_tcp_connection_failure] = connection_failure_handler
         connection_settings[:on_possible_authentication_failure] = authentication_failure_handler
         connection_settings
