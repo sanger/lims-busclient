@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    lims-busclient (0.4.1.rc1)
+    lims-busclient (0.4.1)
       aequitas
       amqp
       facets
@@ -11,7 +11,7 @@ GEM
   remote: http://www.rubygems.org/
   specs:
     aequitas (0.0.2)
-    amq-protocol (1.8.0)
+    amq-protocol (1.9.0)
     amqp (1.1.1)
       amq-protocol (>= 1.8.0)
       eventmachine
